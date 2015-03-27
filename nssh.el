@@ -1,6 +1,6 @@
- ;;; nss.el --- New SSH mode for Emacs
+;;; nssh.el --- New SSH mode for Emacs
 
-;; Copyright (C) 2014  Ian Eure
+;; Copyright (C) 2014, 2015  Ian Eure
 
 ;; Author: Ian Eure <ian.eure@gmail.com>
 ;; Version: 0.9.8b
