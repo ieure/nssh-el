@@ -3,7 +3,7 @@
 ;; Copyright (C) 2014, 2015  Ian Eure
 
 ;; Author: Ian Eure <ian.eure@gmail.com>
-;; Version: 0.9.8b
+;; Version: 0.9.8c
 ;; Keywords: tools, unix, processes
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -73,7 +73,7 @@
   (with-temp-buffer
     (mapc (lambda (file)
             (ignore-errors
-              (insert-file file)
+              (insert-file-contents file)
               (insert "\n")))
           nssh-known-hosts-files)
     (nssh-process-hosts)))
