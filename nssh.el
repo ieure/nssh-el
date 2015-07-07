@@ -3,7 +3,7 @@
 ;; Copyright (C) 2014, 2015  Ian Eure
 
 ;; Author: Ian Eure <ian.eure@gmail.com>
-;; Version: 0.9.8c
+;; Version: 0.9.9
 ;; Keywords: tools, unix, processes
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -127,6 +127,7 @@
       "sudo"
     "ssh"))
 
+;;;###autoload
 (defun nssh (dest &optional buffer)
   "Log into a remote machine with SSH."
   (interactive (list (completing-read "Host: "
