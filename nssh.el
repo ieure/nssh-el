@@ -128,7 +128,7 @@
     "ssh"))
 
 ;;;###autoload
-(defun nssh (dest &optional buffer)
+(defun nssh (dest &optional buffer pop-to)
   "Log into a remote machine with SSH."
   (interactive (list (completing-read "Host: "
                                       (append nssh-history (nssh-known-hosts))
@@ -139,20 +139,22 @@
          (user (car user-host))
          (host (cadr user-host))
          (buf (nssh-buffer user host buffer)))
-    (pop-to-buffer buf)
-    (unless (comint-check-proc (current-buffer))
-      (setq comint-prompt-read-only t)
-      (cd (format "/%s:%s@%s:" (nssh-protocol user) user host))
-      (shell (current-buffer)))))
+    (when pop-to
+      (pop-to-buffer buf))
+    (with-current-buffer buf
+      (unless (comint-check-proc (current-buffer))
+        (setq comint-prompt-read-only t)
+        (cd (format "/%s:%s@%s:" (nssh-protocol user) user host))
+        (shell (current-buffer))))))
 
-(defun nssh-all-1 (dest)
+(defun nssh-all-1 (dest &optional pop-to)
   "Log into all hosts DEST resolves to. Returns new buffers."
   (let* ((user-host (nssh-user-host dest))
          (user (car user-host))
          (host (cadr user-host)))
     (mapcar
      (lambda (ip)
-       (nssh ip (get-buffer-create (nssh-buffer user (format "%s(%s)" host ip) nil))))
+       (nssh ip (get-buffer-create (nssh-buffer user (format "%s(%s)" host ip) nil)) pop-to))
 
      (nssh-resolve host))))
 
@@ -161,8 +163,7 @@
   (interactive (list (completing-read "Host: "
                                       (append nssh-history (nssh-known-hosts))
                                       nil nil nil 'nssh-history)))
-  (nssh-all-1 dest)
-  nil)
+  (nssh-all-1 dest nil t))
 
 
 
@@ -183,15 +184,47 @@
    treated as user input."
   (comint-controller-insert comint-control-prompt))
 
-(defun comint-controller-sender (proc input)
-  "Send input to controlled comints."
+(defun comint-controller-commandp (cmd)
+  "Is this an internal command?"
+
+  (and (> (length cmd) 0)
+       (string= "," (substring cmd 0 1))))
+
+(defun comint-controller-internal-command (proc input)
+  (cond
+   ((string= ",tile" input) (comint-controller-tile))
+   ((string= ",quit" input) (comint-controller-quit))
+   ((string= ",bufs" input) (comint-controller-buffers))))
+
+(defun comint-controller-distribute (input)
+  "Distribute `input' to controlled comints."
   (unwind-protect
       (mapc (lambda (cbuf)
               (with-current-buffer cbuf
                 (insert input)
                 (comint-send-input nil t)))
-            comint-controlled-buffers))
+            comint-controlled-buffers)))
+
+(defun comint-controller-sender (proc input)
+  "Handle comint-controller input"
+
+  (if (comint-controller-commandp input)
+      (comint-controller-internal-command proc input)
+    (comint-controller-distribute input))
+
   (comint-controller-insert-prompt))
+
+(defun comint-controller-quit ()
+  (unwind-protect
+      (mapc (lambda (cbuf)
+              (quit-process (get-buffer-process cbuf)))
+            (cons (current-buffer) comint-controlled-buffers))))
+
+(defun comint-controller-buffers ()
+  (comint-controller-insert ";; Controlling:\n")
+  (mapc (lambda (cbuf)
+          (comint-controller-insert (format ";;  %s\n" (buffer-name cbuf))))
+        comint-controlled-buffers))
 
 (defun comint-controller-tile ()
   "Tile comint-controller windows."
@@ -200,15 +233,10 @@
   (delete-other-windows)
   (let* ((controlwin (split-window-below -10))
          (lastwin (next-window controlwin)))
-
     (loop for rem on comint-controlled-buffers
-
           do
           (let ((buf (car rem))
                 (more (cdr rem)))
-            ;; (message (format "rem=%s" rem))
-            ;; (message (format "(car rem)=%s" (car rem)))
-            ;; (message (format "(cdr rem)=%s" (cdr rem)))
             (message (format "Showing `%s' in `%s'" buf lastwin))
             (set-window-buffer lastwin buf)
             (when more (split-window-right))))
@@ -231,25 +259,24 @@
       (file-error (start-process "comint-controller" (current-buffer) "cat")))
     (set-process-query-on-exit-flag (get-buffer-process (current-buffer)) nil)
     (goto-char (point-max))
-    (comint-controller-insert ";; nssh cluster mode")
-    (mapc comint-controlled-buffers)
-    (comint-controller-insert-prompt)))
+    (comint-controller-insert ";; nssh cluster mode\n\n")))
 
+;;;###autoload
 (defun nssh-cluster (dest)
   (interactive (list (completing-read "Host: "
                                       (append nssh-history (nssh-known-hosts))
                                       nil nil nil 'nssh-history)))
-  (let (old-point)
-    (unless (comint-check-proc "*nssh-control*")
-      (let ((controlbuf (get-buffer-create "*nssh-control*")))
-        (with-current-buffer controlbuf
-          (unless (zerop (buffer-size)) (setq old-point (point)))
-          (comint-controller-mode)
-          (let ((controlled (nssh-all-1 dest)))
-            (with-current-buffer controlbuf
-              (setq comint-controlled-buffers controlled))))))
+  (let ((old-point)
+        (bufname (format "*nssh-control %s*" dest)))
 
-    (pop-to-buffer "*nssh-control*")
+    (unless (comint-check-proc bufname)
+      (let ((controlbuf (get-buffer-create bufname)))
+        (with-current-buffer controlbuf
+          (comint-controller-mode)
+          (unless (zerop (buffer-size)) (setq old-point (point)))
+          (setq-local comint-controlled-buffers (nssh-all-1 dest))
+          (comint-controller-bufs)
+          (comint-controller-insert-prompt))))
     (when old-point (push-mark old-point))))
 
 (provide 'nssh)
