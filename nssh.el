@@ -145,19 +145,112 @@
       (cd (format "/%s:%s@%s:" (nssh-protocol user) user host))
       (shell (current-buffer)))))
 
+(defun nssh-all-1 (dest)
+  "Log into all hosts DEST resolves to. Returns new buffers."
+  (let* ((user-host (nssh-user-host dest))
+         (user (car user-host))
+         (host (cadr user-host)))
+    (mapcar
+     (lambda (ip)
+       (nssh ip (get-buffer-create (nssh-buffer user (format "%s(%s)" host ip) nil))))
+
+     (nssh-resolve host))))
+
 (defun nssh-all (dest)
   "Log into all hosts DEST resolves to."
   (interactive (list (completing-read "Host: "
                                       (append nssh-history (nssh-known-hosts))
                                       nil nil nil 'nssh-history)))
-  (let* ((user-host (nssh-user-host dest))
-         (user (car user-host))
-         (host (cadr user-host)))
-    (mapc
-     (lambda (ip)
-       (nssh ip (get-buffer-create (nssh-buffer user (format "%s(%s)" host ip) nil))))
+  (nssh-all-1 dest)
+  nil)
 
-     (nssh-resolve host))))
+
+
+(defvar comint-controlled-buffers nil
+  "List of comint buffers being controlled")
+(make-variable-buffer-local 'comint-controlled-buffers)
+
+(defconst comint-control-prompt "nssh> ")
+
+(defun comint-controller-insert (content)
+  "Insert some text."
+  (comint-output-filter (get-buffer-process (current-buffer)) content))
+
+(defun comint-controller-insert-prompt ()
+  "Insert the prompt.
+
+   We have to use comint-output-filter, because (insert ...) is
+   treated as user input."
+  (comint-controller-insert comint-control-prompt))
+
+(defun comint-controller-sender (proc input)
+  "Send input to controlled comints."
+  (unwind-protect
+      (mapc (lambda (cbuf)
+              (with-current-buffer cbuf
+                (insert input)
+                (comint-send-input nil t)))
+            comint-controlled-buffers))
+  (comint-controller-insert-prompt))
+
+(defun comint-controller-tile ()
+  "Tile comint-controller windows."
+  (interactive)
+
+  (delete-other-windows)
+  (let* ((controlwin (split-window-below -10))
+         (lastwin (next-window controlwin)))
+
+    (loop for rem on comint-controlled-buffers
+
+          do
+          (let ((buf (car rem))
+                (more (cdr rem)))
+            ;; (message (format "rem=%s" rem))
+            ;; (message (format "(car rem)=%s" (car rem)))
+            ;; (message (format "(cdr rem)=%s" (cdr rem)))
+            (message (format "Showing `%s' in `%s'" buf lastwin))
+            (set-window-buffer lastwin buf)
+            (when more (split-window-right))))
+
+    (setq window-resizeable nil
+          window-size-fixed t))
+  (balance-windows))
+
+(define-derived-mode comint-controller-mode comint-mode
+  "Major mode for controlling multiple comint buffers"
+  (setq comint-prompt-regexp (concat "^" (regexp-quote comint-control-prompt)))
+  (setq comint-use-prompt-regexp t)
+  (setq comint-prompt-read-only t)
+  (setq comint-input-sender 'comint-controller-sender)
+  (unless (comint-check-proc (current-buffer))
+    ;; Was cat, but on non-Unix platforms that might not exist, so
+    ;; use hexl instead, which is part of the Emacs distribution.
+    (condition-case nil
+        (start-process "comint-controller" (current-buffer) "hexl")
+      (file-error (start-process "comint-controller" (current-buffer) "cat")))
+    (set-process-query-on-exit-flag (get-buffer-process (current-buffer)) nil)
+    (goto-char (point-max))
+    (comint-controller-insert ";; nssh cluster mode")
+    (mapc comint-controlled-buffers)
+    (comint-controller-insert-prompt)))
+
+(defun nssh-cluster (dest)
+  (interactive (list (completing-read "Host: "
+                                      (append nssh-history (nssh-known-hosts))
+                                      nil nil nil 'nssh-history)))
+  (let (old-point)
+    (unless (comint-check-proc "*nssh-control*")
+      (let ((controlbuf (get-buffer-create "*nssh-control*")))
+        (with-current-buffer controlbuf
+          (unless (zerop (buffer-size)) (setq old-point (point)))
+          (comint-controller-mode)
+          (let ((controlled (nssh-all-1 dest)))
+            (with-current-buffer controlbuf
+              (setq comint-controlled-buffers controlled))))))
+
+    (pop-to-buffer "*nssh-control*")
+    (when old-point (push-mark old-point))))
 
 (provide 'nssh)
 ;;; nssh.el ends here
