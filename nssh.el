@@ -54,20 +54,20 @@
 
 (defun nssh-process-hosts ()
   (save-match-data
-  (nssh-replace " .*$" "")
-  (nssh-replace "," "\n")
-  ;; IPv4 addresses
-  (flush-lines "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+" (point-min) (point-max))
-  ;; IPv4 addresses
-  (flush-lines "[0-9a-f]\\{4\\}:+" (point-min) (point-max))
-  (flush-lines "^$")
-  (nssh-replace "^\\(.*\\)$" "\"\\1\"")
-  (goto-char (point-min))
-  (insert "(\n")
-  (goto-char (point-max))
-  (insert ")")
-  (goto-char (point-min))
-  (delete-dups (read (current-buffer)))))
+    (nssh-replace " .*$" "")
+    (nssh-replace "," "\n")
+    ;; IPv4 addresses
+    (flush-lines "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+" (point-min) (point-max))
+    ;; IPv4 addresses
+    (flush-lines "[0-9a-f]\\{4\\}:+" (point-min) (point-max))
+    (flush-lines "^$")
+    (nssh-replace "^\\(.*\\)$" "\"\\1\"")
+    (goto-char (point-min))
+    (insert "(\n")
+    (goto-char (point-max))
+    (insert ")")
+    (goto-char (point-min))
+    (delete-dups (read (current-buffer)))))
 
 (defun nssh-known-hosts ()
   (with-temp-buffer
@@ -90,9 +90,9 @@
           (while (memq (process-status proc) '(run open))
             (accept-process-output proc))
           (goto-char (point-min))
-            (while (re-search-forward "Name:.*\nAddress: *\\(.*\\)$" nil t)
-              (add-to-list 'res (buffer-substring (match-beginning 1)
-                                          (match-end 1))))
+          (while (re-search-forward "Name:.*\nAddress: *\\(.*\\)$" nil t)
+            (add-to-list 'res (buffer-substring (match-beginning 1)
+                                                (match-end 1))))
           (kill-buffer (current-buffer)))
         res)
     host))
