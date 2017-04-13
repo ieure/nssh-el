@@ -3,8 +3,9 @@
 ;; Copyright (C) 2014, 2015, 2017  Ian Eure
 
 ;; Author: Ian Eure <ian.eure@gmail.com>
-;; Version: 0.9.10
+;; Version: 0.9.11
 ;; Keywords: tools, unix, processes
+;; Package-Requires: ((emacs "24.3"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -165,11 +166,11 @@
 
 
 
-(defvar comint-controlled-buffers nil
+(defvar nssh-controlled-buffers nil
   "List of comint buffers being controlled")
-(make-variable-buffer-local 'comint-controlled-buffers)
+(make-variable-buffer-local 'nssh-controlled-buffers)
 
-(defconst comint-control-prompt "nssh> ")
+(defconst nssh-comint-prompt "nssh> ")
 
 (defun nssh-comint-controller-insert (content)
   "Insert some text."
@@ -180,7 +181,7 @@
 
    We have to use comint-output-filter, because (insert ...) is
    treated as user input."
-  (nssh-comint-controller-insert comint-control-prompt))
+  (nssh-comint-controller-insert nssh-comint-prompt))
 
 (defun nssh-comint-controller-commandp (cmd)
   "Is this an internal command?"
@@ -201,7 +202,7 @@
               (with-current-buffer cbuf
                 (insert input)
                 (comint-send-input nil t)))
-            comint-controlled-buffers)))
+            nssh-controlled-buffers)))
 
 (defun nssh-comint-controller-sender (proc input)
   "Handle nssh-comint-controller input"
@@ -216,7 +217,7 @@
   (unwind-protect
       (mapc (lambda (cbuf)
               (quit-process (get-buffer-process cbuf)))
-            (cons (current-buffer) comint-controlled-buffers))))
+            (cons (current-buffer) nssh-controlled-buffers)))
 
 (defun nssh-comint-controller-buffers ()
   (nssh-comint-controller-insert ";; Controlling:\n")
