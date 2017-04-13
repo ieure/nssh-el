@@ -164,7 +164,7 @@
   (interactive (list (completing-read "Host: "
                                       (append nssh-history (nssh-known-hosts))
                                       nil nil nil 'nssh-history)))
-  (nssh-all-1 dest nil t))
+  (nssh-all-1 dest nil))
 
 
 
@@ -247,6 +247,7 @@
   (balance-windows))
 
 (define-derived-mode comint-controller-mode comint-mode
+  "comint-controller"
   "Major mode for controlling multiple comint buffers"
   (setq comint-prompt-regexp (concat "^" (regexp-quote comint-control-prompt)))
   (setq comint-use-prompt-regexp t)
