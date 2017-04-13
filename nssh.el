@@ -3,7 +3,7 @@
 ;; Copyright (C) 2014, 2015, 2017  Ian Eure
 
 ;; Author: Ian Eure <ian.eure@gmail.com>
-;; Version: 0.9.11
+;; Version: 0.9.12
 ;; Keywords: tools, unix, processes
 ;; Package-Requires: ((emacs "24.3"))
 
