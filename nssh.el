@@ -22,21 +22,21 @@
 
 ;;; Commentary:
 
-;; nssh is a new SSH mode, based on TRAMP and shell-mode. It takes
+;; nssh is a new SSH mode, based on TRAMP and shell-mode.  It takes
 ;; some inspiration and code from `ssh-mode`, by Noah Friedman.
 
-;; `M-x nssh RET` will open a connection. If a live connection is open,
-;; it will be brought to the foreground. If the buffer exists, but the
-;; process is dead, it will reconnect. With a prefix argument, opens a
+;; `M-x nssh RET` will open a connection.  If a live connection is open,
+;; it will be brought to the foreground.  If the buffer exists, but the
+;; process is dead, it will reconnect.  With a prefix argument, opens a
 ;; new connection.
 
 ;;; Code:
 
 (defvar nssh-history nil
-  "nssh-mode history")
+  "History of hosts logged into with nssh.")
 
 (defvar nssh-sudo t
-  "Use sudo
+  "Whether nssh should use sudo or not.
 
   When T, `nssh' will use the sudo protocol in the case where the
   username of the `nssh' destination is different from
@@ -83,7 +83,7 @@
     (nssh-process-hosts)))
 
 (defun nssh-resolve (host)
-  "Resolve HOSTNAME. Returns a list of IPs."
+  "Resolve HOST.  Return a list of IPs."
   (require 'url-gw)
   (if url-gateway-nslookup-program
       (let ((proc (start-process " *nslookup*" " *nslookup*"
@@ -113,13 +113,13 @@
     (list user host)))
 
 (defun nssh-buffer-name (user host)
-  "Generate a nssh buffer name."
+  "Generate a nssh buffer name based on USER and HOST."
   (if (string= user (user-login-name))
       (format "*ssh %s*" host)
     (format "*ssh %s@%s*" user host)))
 
 (defun nssh-buffer (user host buffer)
-  "Return the target buffer for this nssh session."
+  "Return the target buffer for the session for USER on HOST in BUFFER."
   (get-buffer-create
    (cond ((stringp buffer) buffer)
          ((bufferp buffer) (buffer-name buffer))
@@ -128,13 +128,17 @@
          (t (nssh-buffer-name user host)))))
 
 (defun nssh-protocol (user)
+  "Return the protocol to use when logging in as USER."
   (if (and (not (string= user user-login-name)) nssh-sudo)
       "sudo"
     "ssh"))
 
 ;;;###autoload
 (defun nssh (dest &optional buffer pop-to)
-  "Log into a remote machine with SSH."
+  "Log into DEST with SSH.
+
+   When BUFFER is set, use that buffer.
+   When POP-TO is non-NIL, pop to the SSH buffer."
   (interactive (list (completing-read "Host: "
                                       (append nssh-history (nssh-known-hosts))
                                       nil nil nil 'nssh-history)
@@ -153,7 +157,7 @@
         (shell (current-buffer))))))
 
 (defun nssh-all-1 (dest)
-  "Log into all hosts DEST resolves to. Returns new buffers."
+  "Log into all hosts DEST resolves to.  Return new buffers."
   (let* ((user-host (nssh-user-host dest))
          (user (car user-host))
          (host (cadr user-host)))
@@ -167,36 +171,37 @@
 
 
 (defvar nssh-controlled-buffers nil
-  "List of comint buffers being controlled")
+  "List of comint buffers being controlled.")
 (make-variable-buffer-local 'nssh-controlled-buffers)
 
 (defconst nssh-comint-prompt "nssh> ")
 
 (defun nssh-comint-controller-insert (content)
-  "Insert some text."
+  "Insert CONTENT into the controller buffer."
   (comint-output-filter (get-buffer-process (current-buffer)) content))
 
 (defun nssh-comint-controller-insert-prompt ()
   "Insert the prompt.
 
-   We have to use comint-output-filter, because (insert ...) is
+   We have to use ‘comint-output-filter’, because (insert ...) is
    treated as user input."
   (nssh-comint-controller-insert nssh-comint-prompt))
 
 (defun nssh-comint-controller-commandp (cmd)
-  "Is this an internal command?"
+  "Is CMD an internal controller command?"
 
   (and (> (length cmd) 0)
        (string= "," (substring cmd 0 1))))
 
 (defun nssh-comint-controller-internal-command (proc input)
+  "Return the function to eval for PROC's INPUT."
   (cond
    ((string= ",tile" input) (nssh-comint-controller-tile))
    ((string= ",quit" input) (nssh-comint-controller-quit))
    ((string= ",bufs" input) (nssh-comint-controller-buffers))))
 
 (defun nssh-comint-controller-distribute (input)
-  "Distribute `input' to controlled comints."
+  "Distribute INPUT to controlled comints."
   (unwind-protect
       (mapc (lambda (cbuf)
               (with-current-buffer cbuf
@@ -205,7 +210,7 @@
             nssh-controlled-buffers)))
 
 (defun nssh-comint-controller-sender (proc input)
-  "Handle nssh-comint-controller input"
+  "Handle nssh-comint-controller PROC's INPUT."
 
   (if (nssh-comint-controller-commandp input)
       (nssh-comint-controller-internal-command proc input)
@@ -214,12 +219,14 @@
   (nssh-comint-controller-insert-prompt))
 
 (defun nssh-comint-controller-quit ()
+  "Terminate this cluster session."
   (unwind-protect
       (mapc (lambda (cbuf)
               (quit-process (get-buffer-process cbuf)))
             (cons (current-buffer) nssh-controlled-buffers)))
 
 (defun nssh-comint-controller-buffers ()
+  "Return a list of comint buffers being controlled by this one."
   (nssh-comint-controller-insert ";; Controlling:\n")
   (mapc (lambda (cbuf)
           (nssh-comint-controller-insert (format ";;  %s\n" (buffer-name cbuf))))
@@ -264,6 +271,7 @@
 
 ;;;###autoload
 (defun nssh-cluster (dest)
+  "Log into all IPs which DEST resolves to."
   (interactive (list (completing-read "Host: "
                                       (append nssh-history (nssh-known-hosts))
                                       nil nil nil 'nssh-history)))
@@ -285,6 +293,7 @@
     (when old-point (push-mark old-point))))
 
 (defun nssh-cluster-other-frame (dest)
+  "Log into all IPs which DEST resolves to, in another frame."
   (interactive (list (completing-read "Host: "
                                       (append nssh-history (nssh-known-hosts))
                                       nil nil nil 'nssh-history)))
