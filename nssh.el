@@ -1,4 +1,4 @@
-;;; nssh.el --- New SSH mode for Emacs
+;;; nssh.el --- New SSH mode
 
 ;; Copyright (C) 2014, 2015, 2017  Ian Eure
 
@@ -21,8 +21,8 @@
 
 ;;; Commentary:
 
-;; nssh is a new SSH mode for Emacs, based on TRAMP and shell-mode. It
-;; takes some inspiration and code from `ssh-mode`, by Noah Friedman.
+;; nssh is a new SSH mode, based on TRAMP and shell-mode. It takes
+;; some inspiration and code from `ssh-mode`, by Noah Friedman.
 
 ;; `M-x nssh RET` will open a connection. If a live connection is open,
 ;; it will be brought to the foreground. If the buffer exists, but the
@@ -171,30 +171,30 @@
 
 (defconst comint-control-prompt "nssh> ")
 
-(defun comint-controller-insert (content)
+(defun nssh-comint-controller-insert (content)
   "Insert some text."
   (comint-output-filter (get-buffer-process (current-buffer)) content))
 
-(defun comint-controller-insert-prompt ()
+(defun nssh-comint-controller-insert-prompt ()
   "Insert the prompt.
 
    We have to use comint-output-filter, because (insert ...) is
    treated as user input."
-  (comint-controller-insert comint-control-prompt))
+  (nssh-comint-controller-insert comint-control-prompt))
 
-(defun comint-controller-commandp (cmd)
+(defun nssh-comint-controller-commandp (cmd)
   "Is this an internal command?"
 
   (and (> (length cmd) 0)
        (string= "," (substring cmd 0 1))))
 
-(defun comint-controller-internal-command (proc input)
+(defun nssh-comint-controller-internal-command (proc input)
   (cond
-   ((string= ",tile" input) (comint-controller-tile))
-   ((string= ",quit" input) (comint-controller-quit))
-   ((string= ",bufs" input) (comint-controller-buffers))))
+   ((string= ",tile" input) (nssh-comint-controller-tile))
+   ((string= ",quit" input) (nssh-comint-controller-quit))
+   ((string= ",bufs" input) (nssh-comint-controller-buffers))))
 
-(defun comint-controller-distribute (input)
+(defun nssh-comint-controller-distribute (input)
   "Distribute `input' to controlled comints."
   (unwind-protect
       (mapc (lambda (cbuf)
@@ -203,29 +203,29 @@
                 (comint-send-input nil t)))
             comint-controlled-buffers)))
 
-(defun comint-controller-sender (proc input)
-  "Handle comint-controller input"
+(defun nssh-comint-controller-sender (proc input)
+  "Handle nssh-comint-controller input"
 
-  (if (comint-controller-commandp input)
-      (comint-controller-internal-command proc input)
-    (comint-controller-distribute input))
+  (if (nssh-comint-controller-commandp input)
+      (nssh-comint-controller-internal-command proc input)
+    (nssh-comint-controller-distribute input))
 
-  (comint-controller-insert-prompt))
+  (nssh-comint-controller-insert-prompt))
 
-(defun comint-controller-quit ()
+(defun nssh-comint-controller-quit ()
   (unwind-protect
       (mapc (lambda (cbuf)
               (quit-process (get-buffer-process cbuf)))
             (cons (current-buffer) comint-controlled-buffers))))
 
-(defun comint-controller-buffers ()
-  (comint-controller-insert ";; Controlling:\n")
+(defun nssh-comint-controller-buffers ()
+  (nssh-comint-controller-insert ";; Controlling:\n")
   (mapc (lambda (cbuf)
-          (comint-controller-insert (format ";;  %s\n" (buffer-name cbuf))))
+          (nssh-comint-controller-insert (format ";;  %s\n" (buffer-name cbuf))))
         comint-controlled-buffers))
 
-(defun comint-controller-tile ()
-  "Tile comint-controller windows."
+(defun nssh-comint-controller-tile ()
+  "Tile nssh-comint-controller windows."
   (interactive)
 
   (delete-other-windows)
@@ -244,22 +244,22 @@
     (select-window controlwin))
   (balance-windows))
 
-(define-derived-mode comint-controller-mode comint-mode
-  "comint-controller"
+(define-derived-mode nssh-comint-controller-mode comint-mode
+  "nssh-controller"
   "Major mode for controlling multiple comint buffers"
   (setq comint-prompt-regexp (concat "^" (regexp-quote comint-control-prompt)))
   (setq comint-use-prompt-regexp t)
   (setq comint-prompt-read-only t)
-  (setq comint-input-sender 'comint-controller-sender)
+  (setq comint-input-sender 'nssh-comint-controller-sender)
   (unless (comint-check-proc (current-buffer))
     ;; Was cat, but on non-Unix platforms that might not exist, so
     ;; use hexl instead, which is part of the Emacs distribution.
     (condition-case nil
-        (start-process "comint-controller" (current-buffer) "hexl")
-      (file-error (start-process "comint-controller" (current-buffer) "cat")))
+        (start-process "nssh-comint-controller" (current-buffer) "hexl")
+      (file-error (start-process "nssh-comint-controller" (current-buffer) "cat")))
     (set-process-query-on-exit-flag (get-buffer-process (current-buffer)) nil)
     (goto-char (point-max))
-    (comint-controller-insert ";; nssh cluster mode\n\n")))
+    (nssh-comint-controller-insert ";; nssh cluster mode\n\n")))
 
 ;;;###autoload
 (defun nssh-cluster (dest)
@@ -273,14 +273,14 @@
       (let ((controlbuf (get-buffer-create bufname)))
         (with-current-buffer controlbuf
           (setq nssh-old-window-configuration (current-window-configuration))
-          (comint-controller-mode)
+          (nssh-comint-controller-mode)
           (unless (zerop (buffer-size)) (setq old-point (point)))
           (setq-local comint-controlled-buffers (nssh-all-1 dest))
-          (comint-controller-buffers)
-          (comint-controller-insert-prompt)
+          (nssh-comint-controller-buffers)
+          (nssh-comint-controller-insert-prompt)
           (message (format "Current buffer is %s" (current-buffer)))
           (switch-to-buffer controlbuf)
-          (comint-controller-tile))))
+          (nssh-comint-controller-tile))))
     (when old-point (push-mark old-point))))
 
 (defun nssh-cluster-other-frame (dest)
