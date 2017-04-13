@@ -276,9 +276,8 @@
         (with-current-buffer controlbuf
           (comint-controller-mode)
           (unless (zerop (buffer-size)) (setq old-point (point)))
-          (setq-local comint-controlled-buffers (nssh-all-1 dest))
-          (comint-controller-bufs)
-          (comint-controller-insert-prompt))))
+          (setq-local comint-controlled-buffers (nssh-all-1 dest nil))
+          (comint-controller-buffers)
     (when old-point (push-mark old-point))))
 
 (provide 'nssh)
