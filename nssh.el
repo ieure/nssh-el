@@ -148,23 +148,17 @@
         (cd (format "/%s:%s@%s:" (nssh-protocol user) user host))
         (shell (current-buffer))))))
 
-(defun nssh-all-1 (dest &optional pop-to)
+(defun nssh-all-1 (dest)
   "Log into all hosts DEST resolves to. Returns new buffers."
   (let* ((user-host (nssh-user-host dest))
          (user (car user-host))
          (host (cadr user-host)))
     (mapcar
      (lambda (ip)
-       (nssh ip (get-buffer-create (nssh-buffer user (format "%s(%s)" host ip) nil)) pop-to))
+       (nssh ip (get-buffer-create
+                 (nssh-buffer user (format "%s(%s)" host ip) nil))))
 
      (nssh-resolve host))))
-
-(defun nssh-all (dest)
-  "Log into all hosts DEST resolves to."
-  (interactive (list (completing-read "Host: "
-                                      (append nssh-history (nssh-known-hosts))
-                                      nil nil nil 'nssh-history)))
-  (nssh-all-1 dest nil))
 
 
 
@@ -243,7 +237,8 @@
             (when more (split-window-right))))
 
     (setq window-resizeable nil
-          window-size-fixed t))
+          window-size-fixed t)
+    (select-window controlwin))
   (balance-windows))
 
 (define-derived-mode comint-controller-mode comint-mode
@@ -274,11 +269,23 @@
     (unless (comint-check-proc bufname)
       (let ((controlbuf (get-buffer-create bufname)))
         (with-current-buffer controlbuf
+          (setq nssh-old-window-configuration (current-window-configuration))
           (comint-controller-mode)
           (unless (zerop (buffer-size)) (setq old-point (point)))
-          (setq-local comint-controlled-buffers (nssh-all-1 dest nil))
+          (setq-local comint-controlled-buffers (nssh-all-1 dest))
           (comint-controller-buffers)
+          (comint-controller-insert-prompt)
+          (message (format "Current buffer is %s" (current-buffer)))
+          (switch-to-buffer controlbuf)
+          (comint-controller-tile))))
     (when old-point (push-mark old-point))))
+
+(defun nssh-cluster-other-frame (dest)
+  (interactive (list (completing-read "Host: "
+                                      (append nssh-history (nssh-known-hosts))
+                                      nil nil nil 'nssh-history)))
+  (select-frame-set-input-focus (make-frame))
+  (nssh-cluster dest))
 
 (provide 'nssh)
 ;;; nssh.el ends here
