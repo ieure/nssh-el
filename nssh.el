@@ -1,6 +1,6 @@
 ;;; nssh.el --- New SSH mode for Emacs
 
-;; Copyright (C) 2014, 2015  Ian Eure
+;; Copyright (C) 2014, 2015, 2017  Ian Eure
 
 ;; Author: Ian Eure <ian.eure@gmail.com>
 ;; Version: 0.9.9
@@ -116,11 +116,12 @@
 
 (defun nssh-buffer (user host buffer)
   "Return the target buffer for this nssh command."
-  (cond ((stringp buffer) buffer)
-        ((bufferp buffer) (buffer-name buffer))
-        ((or (and (not (eq nil buffer)) (listp buffer)) (numberp buffer))
-         (generate-new-buffer-name (nssh-buffer-name user host)))
-        (t (nssh-buffer-name user host))))
+  (get-buffer-create
+   (cond ((stringp buffer) buffer)
+         ((bufferp buffer) (buffer-name buffer))
+         ((or (and (not (eq nil buffer)) (listp buffer)) (numberp buffer))
+          (generate-new-buffer-name (nssh-buffer-name user host)))
+         (t (nssh-buffer-name user host)))))
 
 (defun nssh-protocol (user)
   (if (and (not (string= user user-login-name)) nssh-sudo)
