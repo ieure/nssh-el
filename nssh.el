@@ -48,11 +48,13 @@
     "~/.ssh/known_hosts"))
 
 (defun nssh-replace (from to)
+  "Replace all occurrences of FROM with TO, in the current buffer."
   (goto-char (point-min))
   (while (re-search-forward from nil t)
     (replace-match to nil nil)))
 
 (defun nssh-process-hosts ()
+  "Process a SSH known_hosts file, returning hosts therein."
   (save-match-data
     (nssh-replace " .*$" "")
     (nssh-replace "," "\n")
@@ -70,6 +72,7 @@
     (delete-dups (read (current-buffer)))))
 
 (defun nssh-known-hosts ()
+  "Return entries from NSSH-KNOWN-HOSTS-FILES for completion."
   (with-temp-buffer
     (mapc (lambda (file)
             (ignore-errors
@@ -115,7 +118,7 @@
     (format "*ssh %s@%s*" user host)))
 
 (defun nssh-buffer (user host buffer)
-  "Return the target buffer for this nssh command."
+  "Return the target buffer for this nssh session."
   (get-buffer-create
    (cond ((stringp buffer) buffer)
          ((bufferp buffer) (buffer-name buffer))
