@@ -170,76 +170,76 @@
 
 
 
-(defvar nssh-controlled-buffers nil
+(defvar nssh-cluster-buffers nil
   "List of comint buffers being controlled.")
-(make-variable-buffer-local 'nssh-controlled-buffers)
+(make-variable-buffer-local 'nssh-cluster-buffers)
 
-(defconst nssh-comint-prompt "nssh> ")
+(defconst nssh-cluster-prompt "nssh> ")
 
-(defun nssh-comint-controller-insert (content)
+(defun nssh-cluster-insert (content)
   "Insert CONTENT into the controller buffer."
   (comint-output-filter (get-buffer-process (current-buffer)) content))
 
-(defun nssh-comint-controller-insert-prompt ()
+(defun nssh-cluster-insert-prompt ()
   "Insert the prompt.
 
    We have to use ‘comint-output-filter’, because (insert ...) is
    treated as user input."
-  (nssh-comint-controller-insert nssh-comint-prompt))
+  (nssh-cluster-insert nssh-cluster-prompt))
 
-(defun nssh-comint-controller-commandp (cmd)
+(defun nssh-cluster-commandp (cmd)
   "Is CMD an internal controller command?"
 
   (and (> (length cmd) 0)
        (string= "," (substring cmd 0 1))))
 
-(defun nssh-comint-controller-internal-command (proc input)
+(defun nssh-cluster-internal-command (proc input)
   "Return the function to eval for PROC's INPUT."
   (cond
-   ((string= ",tile" input) (nssh-comint-controller-tile))
-   ((string= ",quit" input) (nssh-comint-controller-quit))
-   ((string= ",bufs" input) (nssh-comint-controller-buffers))))
+   ((string= ",tile" input) (nssh-cluster-tile))
+   ((string= ",quit" input) (nssh-cluster-quit))
+   ((string= ",bufs" input) (nssh-cluster-buffers))))
 
-(defun nssh-comint-controller-distribute (input)
+(defun nssh-cluster-distribute (input)
   "Distribute INPUT to controlled comints."
   (unwind-protect
       (mapc (lambda (cbuf)
               (with-current-buffer cbuf
                 (insert input)
                 (comint-send-input nil t)))
-            nssh-controlled-buffers)))
+            nssh-cluster-buffers)))
 
-(defun nssh-comint-controller-sender (proc input)
-  "Handle nssh-comint-controller PROC's INPUT."
+(defun nssh-cluster-sender (proc input)
+  "Handle nssh-cluster PROC's INPUT."
 
-  (if (nssh-comint-controller-commandp input)
-      (nssh-comint-controller-internal-command proc input)
-    (nssh-comint-controller-distribute input))
+  (if (nssh-cluster-commandp input)
+      (nssh-cluster-internal-command proc input)
+    (nssh-cluster-distribute input))
 
-  (nssh-comint-controller-insert-prompt))
+  (nssh-cluster-insert-prompt))
 
-(defun nssh-comint-controller-quit ()
+(defun nssh-cluster-quit ()
   "Terminate this cluster session."
   (unwind-protect
       (mapc (lambda (cbuf)
               (quit-process (get-buffer-process cbuf)))
-            (cons (current-buffer) nssh-controlled-buffers)))
+            (cons (current-buffer) nssh-cluster-buffers))))
 
-(defun nssh-comint-controller-buffers ()
+(defun nssh-cluster-buffers ()
   "Return a list of comint buffers being controlled by this one."
-  (nssh-comint-controller-insert ";; Controlling:\n")
+  (nssh-cluster-insert ";; Controlling:\n")
   (mapc (lambda (cbuf)
-          (nssh-comint-controller-insert (format ";;  %s\n" (buffer-name cbuf))))
-        nssh-controlled-buffers))
+          (nssh-cluster-insert (format ";;  %s\n" (buffer-name cbuf))))
+        nssh-cluster-buffers))
 
-(defun nssh-comint-controller-tile ()
+(defun nssh-cluster-tile ()
   "Tile nssh-comint-controller windows."
   (interactive)
 
   (delete-other-windows)
   (let* ((controlwin (split-window-below -10))
          (lastwin (next-window controlwin)))
-    (loop for rem on nssh-controlled-buffers
+    (loop for rem on nssh-cluster-buffers
           do
           (let ((buf (car rem))
                 (more (cdr rem)))
@@ -252,22 +252,22 @@
     (select-window controlwin))
   (balance-windows))
 
-(define-derived-mode nssh-comint-controller-mode comint-mode
-  "nssh-controller"
+(define-derived-mode nssh-cluster-mode comint-mode
+  "nssh-clusterler"
   "Major mode for controlling multiple comint buffers"
-  (setq comint-prompt-regexp (concat "^" (regexp-quote nssh-comint-prompt)))
+  (setq comint-prompt-regexp (concat "^" (regexp-quote nssh-cluster-prompt)))
   (setq comint-use-prompt-regexp t)
   (setq comint-prompt-read-only t)
-  (setq comint-input-sender 'nssh-comint-controller-sender)
+  (setq comint-input-sender 'nssh-cluster-sender)
   (unless (comint-check-proc (current-buffer))
     ;; Was cat, but on non-Unix platforms that might not exist, so
     ;; use hexl instead, which is part of the Emacs distribution.
     (condition-case nil
-        (start-process "nssh-comint-controller" (current-buffer) "hexl")
-      (file-error (start-process "nssh-comint-controller" (current-buffer) "cat")))
+        (start-process "nssh-cluster" (current-buffer) "hexl")
+      (file-error (start-process "nssh-cluster" (current-buffer) "cat")))
     (set-process-query-on-exit-flag (get-buffer-process (current-buffer)) nil)
     (goto-char (point-max))
-    (nssh-comint-controller-insert ";; nssh cluster mode\n\n")))
+    (nssh-comint-controller-insert ";; nssh control mode\n\n")))
 
 ;;;###autoload
 (defun nssh-cluster (dest)
@@ -276,20 +276,20 @@
                                       (append nssh-history (nssh-known-hosts))
                                       nil nil nil 'nssh-history)))
   (let ((old-point)
-        (bufname (format "*nssh-control %s*" dest)))
+        (bufname (format "*nssh-cluster %s*" dest)))
 
     (unless (comint-check-proc bufname)
       (let ((controlbuf (get-buffer-create bufname)))
         (with-current-buffer controlbuf
           (setq nssh-old-window-configuration (current-window-configuration))
-          (nssh-comint-controller-mode)
+          (nssh-cluster-mode)
           (unless (zerop (buffer-size)) (setq old-point (point)))
-          (setq-local nssh-controlled-buffers (nssh-all-1 dest))
-          (nssh-comint-controller-buffers)
-          (nssh-comint-controller-insert-prompt)
+          (setq-local nssh-cluster-buffers (nssh-all-1 dest))
+          (nssh-cluster-buffers)
+          (nssh-cluster-insert-prompt)
           (message (format "Current buffer is %s" (current-buffer)))
           (switch-to-buffer controlbuf)
-          (nssh-comint-controller-tile))))
+          (nssh-cluster-tile))))
     (when old-point (push-mark old-point))))
 
 (defun nssh-cluster-other-frame (dest)
