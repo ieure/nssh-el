@@ -210,7 +210,7 @@
             nssh-cluster-buffers)))
 
 (defun nssh-cluster-sender (proc input)
-  "Handle nssh-cluster PROC's INPUT."
+  "Handle nssh cluster PROC's INPUT."
 
   (if (nssh-cluster-commandp input)
       (nssh-cluster-internal-command proc input)
