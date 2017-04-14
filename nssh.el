@@ -230,7 +230,7 @@
   (nssh-comint-controller-insert ";; Controlling:\n")
   (mapc (lambda (cbuf)
           (nssh-comint-controller-insert (format ";;  %s\n" (buffer-name cbuf))))
-        comint-controlled-buffers))
+        nssh-controlled-buffers))
 
 (defun nssh-comint-controller-tile ()
   "Tile nssh-comint-controller windows."
@@ -239,7 +239,7 @@
   (delete-other-windows)
   (let* ((controlwin (split-window-below -10))
          (lastwin (next-window controlwin)))
-    (loop for rem on comint-controlled-buffers
+    (loop for rem on nssh-controlled-buffers
           do
           (let ((buf (car rem))
                 (more (cdr rem)))
@@ -255,7 +255,7 @@
 (define-derived-mode nssh-comint-controller-mode comint-mode
   "nssh-controller"
   "Major mode for controlling multiple comint buffers"
-  (setq comint-prompt-regexp (concat "^" (regexp-quote comint-control-prompt)))
+  (setq comint-prompt-regexp (concat "^" (regexp-quote nssh-comint-prompt)))
   (setq comint-use-prompt-regexp t)
   (setq comint-prompt-read-only t)
   (setq comint-input-sender 'nssh-comint-controller-sender)
@@ -284,7 +284,7 @@
           (setq nssh-old-window-configuration (current-window-configuration))
           (nssh-comint-controller-mode)
           (unless (zerop (buffer-size)) (setq old-point (point)))
-          (setq-local comint-controlled-buffers (nssh-all-1 dest))
+          (setq-local nssh-controlled-buffers (nssh-all-1 dest))
           (nssh-comint-controller-buffers)
           (nssh-comint-controller-insert-prompt)
           (message (format "Current buffer is %s" (current-buffer)))
