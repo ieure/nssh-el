@@ -255,8 +255,6 @@
 (define-derived-mode nssh-cluster-mode comint-mode
   "nssh-clusterler"
   "Major mode for controlling multiple comint buffers"
-  (setq comint-prompt-regexp (concat "^" (regexp-quote nssh-cluster-prompt)))
-  (setq comint-use-prompt-regexp t)
   (setq comint-prompt-read-only t)
   (setq comint-input-sender 'nssh-cluster-sender)
   (unless (comint-check-proc (current-buffer))
