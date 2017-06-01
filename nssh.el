@@ -48,6 +48,18 @@
   '("/etc/ssh/ssh_known_hosts"
     "~/.ssh/known_hosts"))
 
+(defvar nssh-cluster-dedicated-frame nil
+  "When t, nssh cluster is in a dedicated frame")
+(make-variable-buffer-local 'nssh-cluster-dedicated-frame)
+
+(defvar nssh-cluster-last-window-config nil
+  "Stores the window configuration before NSSH-CLUSTER was invoked. When NSSH-CLUSTER-DEDICATED-FRAME is NIL, window configuration will be restored from this.")
+(make-variable-buffer-local 'nssh-cluster-last-window-config)
+
+(defvar nssh-cluster-initial-window-config nil
+  "Stores the window configuration just after NSSH-CLUSTER is invoked. When NSSH-CLUSTER-DEDICATED-FRAME is NIL, window configuration will be restored from this.")
+(make-variable-buffer-local 'nssh-cluster-initial-window-config)
+
 (defun nssh-replace (from to)
   "Replace all occurrences of FROM with TO, in the current buffer."
   (goto-char (point-min))
@@ -156,17 +168,13 @@
         (cd (format "/%s:%s@%s:" (nssh-protocol user) user host))
         (shell (current-buffer))))))
 
-(defun nssh-all-1 (dest)
-  "Log into all hosts DEST resolves to.  Return new buffers."
-  (let* ((user-host (nssh-user-host dest))
-         (user (car user-host))
-         (host (cadr user-host)))
-    (mapcar
-     (lambda (ip)
-       (nssh ip (get-buffer-create
-                 (nssh-buffer user (format "%s(%s)" host ip) nil))))
-
-     (nssh-resolve host))))
+(defun nssh-all-1 (user desc hosts)
+  "Log into all hosts DESTS.  Return new buffers."
+  (mapcar
+   (lambda (host)
+     (nssh host (get-buffer-create
+                 (nssh-buffer user (format "%s(%s)" desc host) nil))))
+   hosts))
 
 
 
@@ -265,7 +273,7 @@
       (file-error (start-process "nssh-cluster" (current-buffer) "cat")))
     (set-process-query-on-exit-flag (get-buffer-process (current-buffer)) nil)
     (goto-char (point-max))
-    (nssh-comint-controller-insert ";; nssh control mode\n\n")))
+    (nssh-cluster-insert ";; nssh control mode\n\n")))
 
 ;;;###autoload
 (defun nssh-cluster (dest)
@@ -273,22 +281,24 @@
   (interactive (list (completing-read "Host: "
                                       (append nssh-history (nssh-known-hosts))
                                       nil nil nil 'nssh-history)))
-  (let ((old-point)
-        (bufname (format "*nssh-cluster %s*" dest)))
 
-    (unless (comint-check-proc bufname)
-      (let ((controlbuf (get-buffer-create bufname)))
-        (with-current-buffer controlbuf
-          (setq nssh-old-window-configuration (current-window-configuration))
-          (nssh-cluster-mode)
-          (unless (zerop (buffer-size)) (setq old-point (point)))
-          (setq-local nssh-cluster-buffers (nssh-all-1 dest))
-          (nssh-cluster-buffers)
-          (nssh-cluster-insert-prompt)
-          (message (format "Current buffer is %s" (current-buffer)))
-          (switch-to-buffer controlbuf)
-          (nssh-cluster-tile))))
-    (when old-point (push-mark old-point))))
+    (let* ((controlbuf (get-buffer-create (format "*nssh-cluster %s*" dest)))
+           (user-host (nssh-user-host dest))
+           (user (car user-host))
+           (host (cadr user-host)))
+    (unless (comint-check-proc controlbuf)
+      (with-current-buffer controlbuf
+        (setq nssh-cluster-last-window-config (current-window-configuration))
+        (nssh-cluster-mode)
+        (setq-local nssh-cluster-buffers (nssh-all-1 user host (nssh-resolve host)))
+        (nssh-cluster-buffers)
+        (nssh-cluster-insert-prompt)
+        (message (format "Current buffer is %s" (current-buffer)))
+        (switch-to-buffer controlbuf)
+        (nssh-cluster-tile)
+        (setq nssh-cluster-initial-window-config (current-window-configuration))))
+    controlbuf
+    ))
 
 (defun nssh-cluster-other-frame (dest)
   "Log into all IPs which DEST resolves to, in another frame."
@@ -296,7 +306,8 @@
                                       (append nssh-history (nssh-known-hosts))
                                       nil nil nil 'nssh-history)))
   (select-frame-set-input-focus (make-frame))
-  (nssh-cluster dest))
+  (with-current-buffer (nssh-cluster dest)
+    (setq-local nssh-dedicated-frame t)))
 
 (provide 'nssh)
 ;;; nssh.el ends here
